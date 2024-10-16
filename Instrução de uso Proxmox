@@ -1,0 +1,11 @@
+1. Realize acesso ao seu hypervisor Proxmox;
+2. Na guia API Tokens, adicione um novo usuário e informe o Token ID que ele deverá ter. 
+(Adicione um comentário para que seja visível para outras pessoas que ali é um acesso de leitura).
+3. Criado usuário ele vai gerar um (token)+(usuário), guarde essas informações em um cofre de senhas. 
+4. No campo Show permissions, desmarque a opção Privilege Separation para que seu usuário consiga não somente listas vms, containers, porém ter acesso as outras features do Proxmox. 
+(Caso queira somente ver algo especifico, faça os ajustes necessários)
+5. Acesse seu zabbix
+6. Vá ao módulo Administration, em Macro adicione essa macro de forma global, lembrandoo de colocar os valores de seu ID Secret Text ou Vault Secret. 
+7. No Módulo Data collection, importe seu template do Hypervisor Proxmox em formato Yaml. 
+8. Agora vá em Hosts e adicione o template ao seus nodes do Proxmox. 
+9. Vá em cada node do Proxmox e faça alteração dos Tokens e URL de acesso ao Proxmox com seus users Parameters. 
