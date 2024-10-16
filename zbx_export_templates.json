@@ -43,11 +43,11 @@
                             },
                             {
                                 "name": "secret",
-                                "value": "4f679558-ff13-4e88-bd9b-a1c7eca40cfc"
+                                "value": "{$PVE.TOKEN.SECRET}"
                             },
                             {
                                 "name": "token",
-                                "value": "PVEAPIToken={$PVE.TOKEN.ID}={$PVE.TOKEN.SECRET}"
+                                "value": "{$PVE.TOKEN.ID}"
                             },
                             {
                                 "name": "url",
@@ -80,6 +80,14 @@
                         "delay": "60s",
                         "trends": "0",
                         "value_type": "TEXT",
+                        "preprocessing": [
+                            {
+                                "type": "DISCARD_UNCHANGED_HEARTBEAT",
+                                "parameters": [
+                                    "24h"
+                                ]
+                            }
+                        ],
                         "tags": [
                             {
                                 "tag": "name",
@@ -276,7 +284,7 @@
                 "macros": [
                     {
                         "macro": "{$PVE.TOKEN.ID}",
-                        "value": "PVEAPIToken={$PVE.TOKEN.ID}={$PVE.TOKEN.SECRET}",
+                        "value": "{$PVE.TOKEN.ID}",
                         "description": "User API Proxmox"
                     },
                     {
@@ -341,7 +349,7 @@
                                         "type": "graph",
                                         "y": "4",
                                         "width": "24",
-                                        "height": "6",
+                                        "height": "7",
                                         "fields": [
                                             {
                                                 "type": "GRAPH",
