@@ -1,6 +1,7 @@
 # Proxmox-Zabbix
 Template basic Proxmox collects (vms and containers)
 
+Ambiente Produção validado Zabbix Server 6.4.11 Zabbix-agent2
 
 Leia o arquivo instrução de uso Proxmox
 
