@@ -1,0 +1,364 @@
+zabbix_export:
+  version: '6.4'
+  template_groups:
+    - uuid: 849f1329a80a48af8dd6e0181051d60e
+      name: Hypervisor
+  templates:
+    - uuid: 74d9b3dacd624dd7af1614d9d1677861
+      template: 'Proxmox API - HTTP'
+      name: 'Proxmox API - Hypervisor'
+      description: 'Template Proxmox criado por Fernando Santana - GitHub https://github.com/Fernand0S'
+      groups:
+        - name: Hypervisor
+      items:
+        - uuid: b366cfe5cb6c47d38caccfbf89f0f42d
+          name: 'Proxmox: API service status'
+          type: SCRIPT
+          key: proxmox.api.available
+          delay: 5m
+          params: |
+            try {
+              var params = JSON.parse(value);
+              var req = new HttpRequest();
+              req.addHeader('Authorization: PVEAPIToken=' + params.token + '=' + params.secret);
+              req.get(encodeURI('https://' + params.url + ':' + params.port + '/api2/json/version'));  
+            } catch (error) {
+                Zabbix.log(3, "Proxmox API failed: " + params.url + " Error: " + error);
+                if (!Number.isInteger(error))
+                    return 520;
+            }
+            return req.getStatus();
+          description: 'Get API service status.'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 12h
+          timeout: 10s
+          parameters:
+            - name: port
+              value: '8006'
+            - name: secret
+              value: 4f679558-ff13-4e88-bd9b-a1c7eca40cfc
+            - name: token
+              value: monitor.zabbix@pve!monitor-zabbix
+            - name: url
+              value: '{HOST.CONN}'
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: fef463809d57474d81803e465c4c5080
+              expression: 'last(/Proxmox API - HTTP/proxmox.api.available)<>200'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox API - HTTP/proxmox.api.available)=200'
+              name: 'Proxmox: API service not available'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: HIGH
+              description: 'The API service is not available. Check your network and authorization settings.'
+        - uuid: 7108fc5c5ad94235acd2c721dc48428a
+          name: 'Get cluster name'
+          key: proxmox.cluster.name
+          delay: 60s
+          trends: '0'
+          value_type: TEXT
+          tags:
+            - tag: name
+              value: cluster
+        - uuid: 681c346a6d42496ab4de5d58819429b8
+          name: 'Proxmox: Get nodes'
+          type: HTTP_AGENT
+          key: proxmox.get.nodes
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: 'Error getting data'
+            - type: REGEX
+              parameters:
+                - '"status":\s*"([^"]+)"'
+                - online
+          url: 'https://{HOST.CONN}:{$PVE.URL.PORT}/api2/json/nodes'
+          headers:
+            - name: Authorization
+              value: 'PVEAPIToken={$PVE.TOKEN.ID}={$PVE.TOKEN.SECRET}'
+          tags:
+            - tag: proxmox
+              value: nodes
+          triggers:
+            - uuid: 43ec44c6189a42dd93065224de101ef9
+              expression: 'last(/Proxmox API - HTTP/proxmox.get.nodes)="offline"'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Proxmox API - HTTP/proxmox.get.nodes)="online"'
+              name: 'Proxmox: Get node status'
+              priority: DISASTER
+              description: 'Get node status'
+        - uuid: 466ea4974e5d42738b98d4ea8a04d366
+          name: 'Proxmox: Get vm status'
+          type: HTTP_AGENT
+          key: proxmox.get.vm.status
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: 'Error getting data'
+            - type: REGEX
+              parameters:
+                - '"status":\s*"([^"]+)"'
+                - running
+          url: 'https://{HOST.CONN}:{$PVE.URL.PORT}/api2/json/nodes/{HOST.HOST}/qemu'
+          headers:
+            - name: Authorization
+              value: 'PVEAPIToken={$PVE.TOKEN.ID}={$PVE.TOKEN.SECRET}'
+          tags:
+            - tag: proxmox
+              value: running
+            - tag: service
+              value: status
+        - uuid: 17d55242cab546b985f45464470f4e87
+          name: 'Gets count lxc proxmox'
+          key: proxmox.lxc.count
+          delay: 60s
+          tags:
+            - tag: proxmox
+              value: count
+            - tag: proxmox
+              value: lxc
+          triggers:
+            - uuid: 14633ce5039d4146b0e309df8b26f73c
+              expression: 'last(/Proxmox API - HTTP/proxmox.lxc.count)="+1"'
+              name: 'Uma novo Container foi criado em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+            - uuid: 9199f5b7063747c59585c57a22e97aa2
+              expression: 'last(/Proxmox API - HTTP/proxmox.lxc.count)=-1'
+              name: 'Um Container foi movido em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+            - uuid: b685c33b6c454fb4bc6831372b052e8d
+              expression: 'last(/Proxmox API - HTTP/proxmox.lxc.count)-1'
+              name: 'Um Container foi removido em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+        - uuid: 8328e8584e064579b4ea633e84bd28a6
+          name: 'Gets count vms proxmox'
+          key: proxmox.vm.count
+          delay: 60s
+          tags:
+            - tag: proxmox
+              value: count
+            - tag: proxmox
+              value: vms
+          triggers:
+            - uuid: 085e24726e1b4cc4ae50113d811af6a6
+              expression: 'last(/Proxmox API - HTTP/proxmox.vm.count)="+1"'
+              name: 'Uma nova VM foi criada em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+            - uuid: 1b7d06331946451aa08a77170963352c
+              expression: 'last(/Proxmox API - HTTP/proxmox.vm.count)=-1'
+              name: 'Uma VM foi movida em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+            - uuid: 4e4dc4e3f3aa4a00b7282bea153dde74
+              expression: 'last(/Proxmox API - HTTP/proxmox.vm.count)=-1'
+              name: 'Uma VM foi removida em - {HOST.IP}'
+              opdata: 'Current value: {ITEM.LASTVALUE1}'
+              priority: INFO
+              manual_close: 'YES'
+      tags:
+        - tag: service
+          value: api
+        - tag: software
+          value: proxmox
+      macros:
+        - macro: '{$PVE.TOKEN.ID}'
+          value: monitor.zabbix@pve!monitor-zabbix
+          description: 'User API Proxmox'
+        - macro: '{$PVE.TOKEN.SECRET}'
+          value: 4f679558-ff13-4e88-bd9b-a1c7eca40cfc
+          description: 'Token Proxmox'
+        - macro: '{$PVE.URL.PORT}'
+          value: '8006'
+          description: 'Port Proxmox'
+      dashboards:
+        - uuid: b4648148ac07427fbe25cd6e31a8111f
+          name: 'Get Nodes (Proxmox)'
+          pages:
+            - name: 'Proxmox Get Nodes (Containers e VMs)'
+              widgets:
+                - type: item
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.cluster.name
+                - type: item
+                  'y': '2'
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.lxc.count
+                - type: graph
+                  'y': '4'
+                  width: '22'
+                  height: '4'
+                  fields:
+                    - type: GRAPH
+                      name: graphid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        name: 'Proxmox - API'
+                - type: item
+                  x: '4'
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.vm.count
+                - type: item
+                  x: '4'
+                  'y': '2'
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.api.available
+                - type: item
+                  x: '8'
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.get.nodes
+                - type: item
+                  x: '8'
+                  'y': '2'
+                  width: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: ITEM
+                      name: itemid
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.get.vm.status
+                - type: plaintext
+                  x: '12'
+                  width: '6'
+                  height: '4'
+                  fields:
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.api.available
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.cluster.name
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.get.nodes
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.get.vm.status
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.lxc.count
+                    - type: ITEM
+                      name: itemids
+                      value:
+                        host: 'Proxmox API - HTTP'
+                        key: proxmox.vm.count
+                - type: clock
+                  x: '18'
+                  width: '4'
+                  height: '4'
+                  fields:
+                    - type: INTEGER
+                      name: adv_conf
+                      value: '1'
+                    - type: INTEGER
+                      name: clock_type
+                      value: '1'
+                    - type: INTEGER
+                      name: show
+                      value: '1'
+                    - type: INTEGER
+                      name: show
+                      value: '2'
+                    - type: INTEGER
+                      name: show
+                      value: '3'
+                    - type: INTEGER
+                      name: time_size
+                      value: '20'
+                    - type: STRING
+                      name: tzone_timezone
+                      value: America/Sao_Paulo
+  graphs:
+    - uuid: 0a4ed9c72e2246d692a12cde2f5eca8f
+      name: 'Proxmox - API'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'Proxmox API - HTTP'
+            key: proxmox.lxc.count
+        - sortorder: '1'
+          color: '274482'
+          calc_fnc: ALL
+          item:
+            host: 'Proxmox API - HTTP'
+            key: proxmox.vm.count
+        - sortorder: '2'
+          color: F63100
+          calc_fnc: ALL
+          item:
+            host: 'Proxmox API - HTTP'
+            key: proxmox.api.available
